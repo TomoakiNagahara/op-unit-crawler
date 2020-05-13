@@ -1,10 +1,9 @@
 <?php
-/**
- * unit-crawler:/DB.class.php
+/** op-unit-crawler:/DB.class.php
  *
  * @created   2019-05-31
  * @version   1.0
- * @package   unit-crawler
+ * @package   op-unit-crawler
  * @author    Tomoaki Nagahara <tomoaki.nagahara@gmail.com>
  * @copyright Tomoaki Nagahara All right reserved.
  */
@@ -23,8 +22,6 @@ use OP\OP_CORE;
 /** DB
  *
  * @created   2019-05-31
- * @version   1.0
- * @package   unit-crawler
  * @author    Tomoaki Nagahara <tomoaki.nagahara@gmail.com>
  * @copyright Tomoaki Nagahara All right reserved.
  */

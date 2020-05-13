@@ -1,10 +1,9 @@
 <?php
-/**
- * unit-crawler:/crawler.class.php
+/** op-unit-crawler:/Crawler.class.php
  *
  * @created   2019-05-30
  * @version   1.0
- * @package   unit-crawler
+ * @package   op-unit-crawler
  * @author    Tomoaki Nagahara <tomoaki.nagahara@gmail.com>
  * @copyright Tomoaki Nagahara All right reserved.
  */
@@ -22,7 +21,10 @@ use OP\OP_CORE;
 use OP\OP_UNIT;
 use OP\IF_UNIT;
 use OP\Env;
+use OP\Debug;
+use function OP\Html;
 use function OP\ConvertPath;
+use function OP\APP\Request;
 
 /** Crawler
  *
@@ -37,12 +39,26 @@ class Crawler implements IF_UNIT
 	/** trait.
 	 *
 	 */
-	use OP_CORE, OP_UNIT;
+	use OP_CORE, OP_UNIT, CRAWLER_CORE, CRAWLER_HELPER;
 
 	/** Current url ai.
 	 *  Use for referer.
+	 *
+	 *  @param integer
 	 */
-	static $_current_ai;
+	private $_current_ai;
+
+	/** Inherit priority score.
+	 *
+	 * @var       integer
+	 */
+	private $_current_score;
+
+	/** Current scheme.
+	 *
+	 * @var       integer
+	 */
+	private $_current_scheme;
 
 	/** URL
 	 *
@@ -65,10 +81,11 @@ class Crawler implements IF_UNIT
 	 * @param  string  $html    Target page html
 	 * @param  array   $config  Configuration
 	 */
-	static private function _RegisterLink($url, $mime, &$html, $config)
+	private function _RegisterLink($url, $mime, &$html, $config)
 	{
 		//	...
-		if(!$doc_root = $config['document_root'] ?? null ){
+		if(!$doc_root = $config['rewrite_base'] ?? null ){
+			\OP\Notice::Set("\$config['rewrite_base'] is empty.");
 			return;
 		};
 
@@ -78,19 +95,23 @@ class Crawler implements IF_UNIT
 		$doc_root = $doc_root ? "/{$doc_root}/": '/';
 
 		//	...
-		$parsed = self::URL()->Parse($url);
+		$parsed = $this->URL()->Parse($url);
 
 		//	...
 		switch( $mime ){
+			//	Content is css.
 			case 'text/css':
-				self::_RegisterLinkStyle($parsed, $html, $doc_root);
+				$this->_RegisterLinkStyle($parsed, $html, $doc_root);
 			return;
 
+			//	Content is html.
 			case 'text/html':
 				$matches = null;
 				preg_match_all('|<style>(.+)</style>|is', $html, $matches, PREG_SET_ORDER);
+				//	Loop each style in html.
 				foreach( $matches ?? [] as $match ){
-					self::_RegisterLinkStyle($parsed, $match[1], $doc_root);
+					//	Rewrite path of link.
+					$this->_RegisterLinkStyle($parsed, $match[1], $doc_root);
 					$orig = $match[0];
 					$path = '<style>'.$match[1].'</style>';
 					$html = str_replace($orig, $path, $html);
@@ -108,8 +129,9 @@ class Crawler implements IF_UNIT
 		$lists['a']      = ['tag'=>'|(<a ([^>]+)>(.*?)</a>)|is'          , 'attr'=>'href'];
 		$lists['img']    = ['tag'=>'|(<img ([^>]+)>)|is'                 , 'attr'=>'src'];
 		$lists['script'] = ['tag'=>'|(<script ([^>]+)>(.*?)</script>)|is', 'attr'=>'src'];
+		$lists['form']   = ['tag'=>'|(<form ([^>]+)>(.*?)</form>)|is'    , 'attr'=>'action'];
 
-		/*
+		/* Will correspond to OGP.
 		<meta property="og:image"       content="/img/cct/index/ogp.jpg">
 		*/
 
@@ -144,7 +166,7 @@ class Crawler implements IF_UNIT
 				};
 
 				//	...
-				self::_RegisterFullPath($parsed, $match[2], $doc_root);
+				$this->_RegisterFullPath($parsed, $match[2], $doc_root);
 
 				//	...
 				if(!$doc_root ){
@@ -157,7 +179,7 @@ class Crawler implements IF_UNIT
 				 *  http://example.com/foo/bar --> /example.com/foo/bar
 				 *  </pre>
 				 */
-				if( $rootpath = self::_DocumentRootPath($parsed, $match[2], $doc_root) ){
+				if( $rootpath = $this->_DocumentRootPath($parsed, $match[2], $doc_root) ){
 
 					//	...
 					$orig = $list['attr'].'='.$match[1].$match[2].$match[1];
@@ -165,6 +187,9 @@ class Crawler implements IF_UNIT
 
 					//	Touch html source code.
 					$html = str_replace($orig, $path, $html);
+				}else{
+					//	Not need to replace.
+				//	D( $rootpath, $parsed, $match[2], $doc_root );
 				};
 			};
 		};
@@ -176,12 +201,13 @@ class Crawler implements IF_UNIT
 	 * @param string $html
 	 * @param string $doc_root
 	 */
-	static private function _RegisterLinkStyle($parsed, &$html, $doc_root)
+	private function _RegisterLinkStyle($parsed, &$html, $doc_root)
 	{
 		//	...
 		$matches = null;
 
 		//	url(/images/bg.png)
+		//	(.*?) <-- Why necessary empty string?
 		preg_match_all('/url\((.*?)\)/is', $html, $matches, PREG_SET_ORDER);
 
 		//	...
@@ -190,16 +216,21 @@ class Crawler implements IF_UNIT
 			$link = $match[1];
 			$link = trim($link);
 
+			//	Ignore empty string.
+			if( empty($link) ){
+				continue;
+			}
+
 			//	...
 			if( $link[0] === '"' or $link[0] === "'" ){
 				$link = trim($link, '"\'');
 			};
 
 			//	...
-			self::_RegisterFullPath($parsed, $link, $doc_root);
+			$this->_RegisterFullPath($parsed, $link, $doc_root);
 
 			//	Change to new document root path.
-			if( $rootpath = self::_DocumentRootPath($parsed, $link, $doc_root) ){
+			if( $rootpath = $this->_DocumentRootPath($parsed, $link, $doc_root) ){
 
 				//	...
 				$orig = $match[0];
@@ -215,40 +246,34 @@ class Crawler implements IF_UNIT
 	 *
 	 * @param array  $parsed
 	 * @param string $href
-	 * @param string $doc_root
 	 */
-	static private function _RegisterFullPath($parsed, $href, $doc_root)
+	private function _RegisterFullPath($parsed, $href)
 	{
-		//	...
-		$doc_root = rtrim($doc_root,'/');
-
-		//	...
-		do{
 			//	...
 			if( strpos($href, '#') === 0 ){
-				continue;
+				return;
 			};
 
 			//	...
 			if( strpos($href, 'mailto:') === 0 ){
-				continue;
+				return;
 			};
 
 			//	...
 			if( $href === $parsed['path'] ){
-				continue;
+				return;
 			};
 
 			//	FQDN
 			if( preg_match('|^[a-z+]+://|', $href) ){
-				self::Register(array_merge(parse_url($href), ['scheme' => $parsed['scheme']]));
-				continue;
+				$merged = array_merge(['scheme' => $parsed['scheme']], parse_url($href));
+				return $this->Register($merged);
 			};
 
 			//	Scheme less path. (FQDN)
 			if( strpos($href, '//') === 0 ){
-				self::Register(array_merge(parse_url($href), ['scheme' => $parsed['scheme']]));
-				continue;
+				$merged = array_merge(parse_url($href), ['scheme' => $parsed['scheme']]);
+				return $this->Register($merged);
 			};
 
 			//	Separate to path and query.
@@ -267,14 +292,13 @@ class Crawler implements IF_UNIT
 
 			/*
 			//	...
-			$path  = self::URL()->Parse($href)['path'];
-			$query = self::URL()->Parse($href)['query'];
+			$path  = $this->URL()->Parse($href)['path'];
+			$query = $this->URL()->Parse($href)['query'];
 			*/
 
 			//	Document root path.
 			if( strpos($path, '/') === 0 ){
-				self::Register(array_merge($parsed, ['path'=>$path,'query'=>$query]));
-				continue;
+				return $this->Register(array_merge($parsed, ['path'=>$path,'query'=>$query]));
 			};
 
 			//	Current relative path.
@@ -316,20 +340,21 @@ class Crawler implements IF_UNIT
 				$path = rtrim($parent_dir,'/') .'/'. $path;
 			};
 
-			//	...
+			//	What is this needed for?
+			/*
 			if( dirname($parsed['path']) === '/' ){
 				\OP\Debug::Set('path',"Path is not has parent directory. ({$parsed['path']}, $path)");
 				continue;
 			};
-
+			*/
 
 			//	Same path.
 			if( $path === $parsed['path'] ){
 				//	Different queries.
 				if( $query !== $parsed['query'] ){
-					self::Register(array_merge($parsed, ['query'=>$query]));
+					$this->Register(array_merge($parsed, ['query'=>$query]));
 				};
-				continue;
+				return;
 			};
 
 			//	Current relate path.
@@ -362,21 +387,23 @@ class Crawler implements IF_UNIT
 			};
 
 			//	...
-			self::Register(array_merge($parsed, ['path'=>$path,'query'=>$query]));
-
-		}while(false);
+			return $this->Register(array_merge($parsed, ['path'=>$path,'query'=>$query]));
 	}
 
-	/** Calculate new document root path.
+	/** Change document root path And remove FQDN.
+	 *
+	 *  <pre>
+	 *  http://example.com/foo/bar --> /example.com/foo/bar
+	 *  </pre>
 	 *
 	 * @param  array  $parsed
 	 * @param  string $path
-	 * @param  string $doc_root
-	 * @return string $doc_root
+	 * @param  string $rewrite_base
+	 * @return string $doc_root_path
 	 */
-	static private function _DocumentRootPath($parsed, $path, $doc_root)
+	private function _DocumentRootPath($parsed, $path, $doc_root)
 	{
-		//	FQDN
+		//	Check include scheme FQDN.
 		foreach( ['//','http://','https://'] as $scheme ){
 
 			//	If matches is has FQDN.
@@ -395,16 +422,16 @@ class Crawler implements IF_UNIT
 				return $path;
 			}else{
 				//	If unmatches is external host.
-				self::Register($path);
+				$this->Register($path);
 
 				//	...
-				$host = self::URL()->Parse($path)['host'];
+				$host = $this->URL()->Parse($path)['host'];
 
 				//	...
-				$ai = self::URL()->Host()->Ai($host);
+				$ai = $this->URL()->Host()->Ai($host);
 
 				//	Increment score.
-				self::URL()->Host()->Update($ai, [' score + 1 ']);
+				$this->URL()->Host()->Update($ai, [' score + 1 ']);
 
 				//	Change to doc_root by remove scheme. http://example.com --> /example.com
 				$path = substr($path, strlen($scheme) -1 );
@@ -432,152 +459,64 @@ class Crawler implements IF_UNIT
 
 	/** Generate fetch record condition use by Auto().
 	 *
-	 * @created 2019-07-26
 	 * @param   array      $config
 	 * @return  array      $condition
 	 */
-	static private function _AutoCondition($config)
+	private function _AutoCondition($config)
 	{
 		//	...
 		$cond = [];
 
 		//	...
-		if( $url = $config['url'] ?? null ){
+		if( $ai = $config['ai'] ?? null ){
 
 			//	...
-			$cond['where'][] = ' t_url.ai = ' . self::URL()->Ai($url);
+			$cond['where'][] = " t_url.ai = $ai ";
 
-		}else if( $ai = $config['ai'] ?? null ){
+		}else if( $url = $config['url'] ?? null ){
 
 			//	...
-			$cond['where'][] = ' t_url.ai = ' . $ai;
+			$cond['where'][] = ' t_url.ai = ' . $this->URL()->Ai($url);
 
 		}else{
 
 			//	...
-			$host = $config['host'] ?? self::URL()->Host()->Get(["ai > 0", 'order' => "score desc"])['host'];
+			$host = $config['host'] ?? $this->URL()->Host()->Get(["ai > 0", 'order' => "score desc"])['host'];
 
 			//	...
 			if( $host ){
 
 				//	Only the URL of this host name is acquired.
-				$host = self::URL()->Host()->Ai($host);
-
-				//	Cycle period to crawl.
-				$cycle     = \OP\Env::Get('crawler')['offset'] ?? ' -30 days ';
-				$timestamp = date(_OP_DATE_TIME_, strtotime($cycle));
+				$host = $this->URL()->Host()->Ai($host);
 
 				//	...
-				$cond['where'][] = "t_host.ai = $host";
-				$cond['where'][] = "t_url.crawled < $timestamp";
-				//	$cond['order']   = 't_url.http_status_code, t_url.timestamp, t_url.score desc';
+				$request = \OP\Request();
+
+				//	Cycle period to crawl.
+				if( $cycle     = $request['cycle'] ?? null ){
+					$cycle     = Env::Get('crawler')['cycle'] ?? ' -30 days ';
+					$time      = strtotime($cycle, Env::Time());
+					$timestamp = gmdate(_OP_DATE_TIME_, $time);
+				}
+
+				//	...
+			//	$cond['order']   = 't_url.http_status_code, t_url.timestamp, t_url.score desc';
 				$cond['order']   = 't_url.http_status_code, t_url.score desc';
+
+				//	...
+				$cond['where'][] = "t_url.host = $host";
+
+				//	...
+				if( $timestamp ?? null ){
+					$cond['where'][] = "t_url.crawled < $timestamp ";
+				}else{
+					$cond['where'][] = "t_url.crawled is null ";
+				}
 			}
 		};
 
 		//	...
 		return $cond;
-	}
-
-	/** Fetch http content.
-	 *
-	 * @created  2019-07-30
-	 * @param    array      $record
-	 * @throws  \Exception
-	 * @return   array      [head, body]
-	 */
-	static function _AutoHttp($record)
-	{
-		//	If 30x status.
-		if( strpos($record['http_status_code'], '30') === 0 or $record['http_status_code'] === '404' ){
-			if( $record['transfer'] ){
-				D($record);
-				return;
-			};
-		};
-
-		//	...
-		if(!$http = self::Fetch($record) ){
-			D($record);
-			return;
-		};
-
-		//	...
-		$update = [];
-		$update['http_status_code'] = $http['head']['status'] ?? null;
-		$update['crawled'] = gmdate(_OP_DATE_TIME_, Env::Time());
-		self::URL()->Update($record['ai'], $update);
-
-		//	...
-		switch( $http['head']['status'] ?? null ){
-			case 301: // Moved Permanently.
-			case 302: // Temporary Redirect(Only GET  method)
-			case 307: // Temporary Redirect(Keep POST method)
-			case 303: // Upload progress page
-				//	...
-				if(!$location = $http['head']['location'] ){
-					throw new \Exception("Empty location.");
-				};
-
-				//	...
-				$scheme = $record['scheme'];
-
-				//	...
-				foreach( self::URL()->Parse($location) as $key => $val ){
-					if( $val ){
-						$record[$key] = $val;
-					};
-				};
-
-				//	...
-				if( $ai = self::Register($record) ){
-					//	...
-					if( $ai == $record['ai'] ){
-						//	Change scheme to https from http.
-						if( $scheme === 'http' and $record['scheme'] === 'https' ){
-							$update = [];
-							$update['http_status_code'] = null;
-							$update['scheme'] = $record['scheme'];
-							self::URL()->Update($record['ai'], $update);
-						};
-					}else{
-						//	...
-						$update = [];
-						$update['transfer'] = $ai;
-						self::URL()->Update($record['ai'], $update);
-					};
-				};
-
-				//	...
-				break;
-
-			//	Method Not Allowed
-			case 405:
-				//	Change to allowed method.
-				if( $method = $http['head']['allow'] ?? null ){
-
-					//	Rebuild form queries.
-					$form = $record['form'] ? parse_str($record['form']): [];
-					$form['method'] = $method;
-					$form = urldecode(http_build_query($form));
-
-					//	...
-					if(!self::URL()->Ai( array_merge($record, ['form'=>$form]) ) ){
-						//	Update
-						$update = [];
-						$update['http_status_code'] = null;
-						$update['form'] = self::URL()->Form()->Ai($form);
-						self::URL()->Update($record['ai'], $update);
-					};
-				};
-				break;
-
-			//	...
-			default:
-		};
-
-		//	...
-		return $http;
 	}
 
 	/** Automatically
@@ -586,10 +525,10 @@ class Crawler implements IF_UNIT
 	 * @param array    $config
 	 * @param callable $callback
 	 */
-	static function Auto($config, $callback)
+	function Auto($config, $callback)
 	{
 		//	...
-		if(!$cond = self::_AutoCondition($config) ){
+		if(!$cond = $this->_AutoCondition($config) ){
 			return;
 		};
 
@@ -597,29 +536,45 @@ class Crawler implements IF_UNIT
 		$limit = $config['limit'] ?? 1;
 
 		//	...
-		if( $limit > 100 ){
-			$limit = 100;
+		if( $limit > 1000 ){
+			$limit = 1000;
 		};
 
 		//	...
 		for( $i=0; $i<$limit; $i++ ){
 			//	...
-			if(!$record = self::URL()->Record($cond) ){
+			if(!$record = $this->URL()->Record($cond) ){
 				return;
 			};
 
-			//	...
-			$url = self::URL()->Build($record);
-			$ai  = $record['ai'];
-			self::$_current_ai = $ai;
+			//	Calculate score.
+			$score = $record['score'] > 0 ? $record['score']: 1;
+			$score = $score > 100 ? 1: $score;
+
+			//	Inherit source record score.
+			$this->_current_score = $score;
+
+			//	Inherit source record scheme.
+			$this->_current_scheme = $record['scheme'];
 
 			//	...
-			if(!$http = self::_AutoHttp($record) ){
+			$url = $this->URL()->Build($record);
+			$ai  = $record['ai'];
+			$this->_current_ai = $ai;
+
+			//	...
+			if(!$http = $this->_AutoHttp($record) ){
 				continue;
 			};
 
+			/*
+			if( $record['form'] ){
+				D($url, $record, $http);
+			}
+			*/
+
 			//	...
-			self::_RegisterLink($url, $http['head']['mime'] ?? null, $http['body'], $config);
+			$this->_RegisterLink($url, $http['head']['mime'] ?? null, $http['body'], $config);
 
 			//	...
 			if( $callback ){
@@ -646,33 +601,41 @@ class Crawler implements IF_UNIT
 		return $_DB;
 	}
 
-	static function Register($parsed)
+	/** Register target URL.
+	 *
+	 * @param     array  $parsed
+	 * @return    number $ai
+	 */
+	function Register($parsed)
 	{
 		//	...
-		if(!$ai = self::URL()->Register($parsed) ){
+		if( is_string($parsed) ){
+			$parsed = $this->URL()->Parse($parsed);
+		}
+
+		//	Set referer url ai.
+		$parsed['referer'] = $this->_current_ai;
+
+		//	Inherit current record scheme.
+		if( $parsed['scheme'] !== 'https' and $this->_current_scheme === 'https' ){
+			$parsed['scheme']  =  $this->_current_scheme;
+		}
+
+		//	...
+		if(!$ai = $this->URL()->Register($parsed, $this->_current_score) ){
 			return;
 		};
-
-		//	...
-		$update = [];
-		$update['referer'] = self::$_current_ai;
-
-		//	...
-		$where = ['referer is null'];
-
-		//	...
-		self::URL()->Update($ai, $update, $where);
 
 		//	...
 		return $ai;
 	}
 
-	/** Fetch target content.
+	/** Fetch by t_url record.
 	 *
 	 * @param  array $record
 	 * @return array $http
 	 */
-	static function Fetch($record)
+	function Fetch($record)
 	{
 		//	...
 		$method = 'Get';
@@ -691,7 +654,7 @@ class Crawler implements IF_UNIT
 			parse_str($record['form'], $form);
 
 			//	...
-			$method = $form['method'] ?? 'Post';
+			$method = 'Post';
 		};
 
 		//	...
@@ -700,30 +663,57 @@ class Crawler implements IF_UNIT
 		};
 
 		//	...
-		$url = self::URL()->Build($record);
+		$url = $this->URL()->Build($record);
 
-		//	...
+		//	Get referer url.
+		if( $referer = $record['referer'] ?? '' ){
+			$referer = $this->URL()->Get($referer);
+		}
+
+		//	Generate option.
 		$option = [];
 		$option['header'] = 1;
-		$option['cookie'] = ConvertPath('asset:/cache/cookie/').$record['host'];
+		$option['cookie'] = ConvertPath('asset:/cache/cookie/', false).$record['host'];
+		$option['referer'] = $referer;
+		$option['ua']      = Env::Get('crawler')['useragent'];
+		$option['timeout'] = 10;
 
-		//	...
-		$data = array_merge($query, $form['input'] ?? []) ?? null;
+		//	Generate POST data if method is Post.
+		$data = ( $method === 'Post' ) ? array_merge($query, $form ?? []): null;
 
 		/* @var $curl \OP\UNIT\Curl */
-		$curl = self::Unit('Curl');
+		$curl = $this->Unit('Curl');
+
+		//	Execute Curl.
+		$http = $curl->{$method}($url, $data, $option);
 
 		//	...
-		if(!$http = $curl->{$method}($url, $data, $option) ){
+		if( Debug::isDebug(__CLASS__) ){
+			D( ['method'=>$method, 'URL'=>$url, 'data'=>$data, 'option'=>$option, 'record'=>$record], $http);
+		}
+
+		/* Do in CRAWLER_HELPER::_AutoHttp()
+		//	...
+		if( isset($http['head']['status']) ){
+			//	Remove transfer ai. This case is login form transfer.
+			if( $http['head']['status'] === '200' and $record['transfer'] ){
+				$this->URL()->URL()->Update($record['ai'], ['transfer'=>null]);
+			}
+		}else{
+			D($url, $data, $option, $http);
+		}
+		*/
+
+		//	...
+		if(!$http ){
 			return false;
 		};
 
-		//	...
+		//	Check if headless browser.
 		if( $record['headless'] ?? null ){
-			//	...
+			//	Check if mime. Execute only when text/html.
 			if( $http['head']['mime'] === 'text/html' ){
-				D($url, $http['head']['mime']);
-				$http['body'] = self::Unit('Google')->Chrome($url);
+				$http['body'] = $this->Unit('Google')->Chrome($url);
 			};
 		};
 
@@ -731,8 +721,13 @@ class Crawler implements IF_UNIT
 		return $http;
 	}
 
+	/** Debug
+	 *
+	 */
 	static function Debug()
 	{
-	//	self::DB()->Debug();
+	//	$this->DB()->Debug();
+		\OP\Debug::Out();
+	//	$this->URL()->DB()->Query();
 	}
 }

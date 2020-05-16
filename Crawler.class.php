@@ -505,6 +505,33 @@ class Crawler implements IF_UNIT
 		return $cond;
 	}
 
+	/** Is skip mime.
+	 *
+	 * @created   2020-05-15
+	 * @param     string       $mime
+	 * @return    boolean
+	 */
+	private static function _IsSkipMime(string $mime):bool
+	{
+		//	...
+		list($cate, $type) = explode('/', $mime);
+
+		//	...
+		if( $cate == 'image' ){
+			return true;
+		}
+
+		//	...
+		switch( $type ){
+			case 'js':
+			case 'css':
+				return true;
+		}
+
+		//	...
+		return false;
+	}
+
 	/** Automatically
 	 *
 	 * @param string   $host

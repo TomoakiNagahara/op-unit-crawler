@@ -23,5 +23,16 @@ namespace OP\UNIT;
  */
 trait CRAWLER_CORE
 {
+	/** URL
+	 *
+	 * @return  \OP\UNIT\URL
+	 */
+	static function URL()
+	{
+		//	...
+		static $_url;
 
+		//	...
+		return $_url ?? $_url = new \OP\UNIT\URL();
+	}
 }

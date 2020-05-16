@@ -11,3 +11,4 @@
 include(__DIR__.'/CRAWLER_CORE.trait.php');
 include(__DIR__.'/CRAWLER_HELPER.trait.php');
 include(__DIR__.'/Crawler.class.php');
+include(__DIR__.'/Condition.class.php');

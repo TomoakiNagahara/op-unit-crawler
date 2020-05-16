@@ -60,20 +60,6 @@ class Crawler implements IF_UNIT
 	 */
 	private $_current_scheme;
 
-	/** URL
-	 *
-	 * @created  2019-06-12
-	 * @return  \OP\UNIT\URL
-	 */
-	static function URL()
-	{
-		//	...
-		static $_url;
-
-		//	...
-		return $_url ?? $_url = new \OP\UNIT\URL();
-	}
-
 	/** Register each link in target page.
 	 *
 	 * @param  string  $url     Target page url

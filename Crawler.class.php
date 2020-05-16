@@ -25,6 +25,8 @@ use OP\Debug;
 use function OP\Html;
 use function OP\ConvertPath;
 use function OP\APP\Request;
+use function OP\Load;
+use function OP\GetExtension;
 
 /** Crawler
  *
@@ -530,6 +532,36 @@ class Crawler implements IF_UNIT
 
 		//	...
 		return false;
+	}
+
+	/** Additional score by extension.
+	 *
+	 * @created   2020-05-16
+	 * @param     string       $path
+	 * @return    integer      $score
+	 */
+	private function _AddScore(string $path):int
+	{
+		//	...
+		$score = 0;
+
+		//	...
+		Load('GetExtension');
+
+		//	...
+		switch( GetExtension($path) ){
+			case 'js':
+			case 'css':
+			case 'gif':
+			case 'png':
+			case 'jpg':
+			case 'jpeg':
+			case 'tiff':
+				$score = 100;
+		}
+
+		//	...
+		return $score;
 	}
 
 	/** Automatically

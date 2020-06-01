@@ -67,18 +67,21 @@ class Crawler implements IF_UNIT
 	 * @param  string  $url     Target page url
 	 * @param  string  $mime    Target page mime
 	 * @param  string  $html    Target page html
-	 * @param  array   $config  Configuration
+	 * @param  string  $rewrite_base Rewrite base
 	 */
-	private function _RegisterLink($url, $mime, &$html, $config)
+	private function _RegisterLink($url, $mime, &$html, string $rewrite_base)
 	{
 		//	...
-		if(!$doc_root = $config['rewrite_base'] ?? null ){
-			\OP\Notice::Set("\$config['rewrite_base'] is empty.");
-			return;
+		if(!$rewrite_base ){
+			throw new \Exception('rewrite_base is empty.');
 		};
+
+		//	/ --> /example.com/
+		$doc_root = $rewrite_base;
 
 		//	'/foo/bar' --> 'foo/bar', '/' --> ''
 		$doc_root = trim($doc_root, '/');
+
 		//	'foo/bar' --> '/foo/bar/', '' --> '/'
 		$doc_root = $doc_root ? "/{$doc_root}/": '/';
 
@@ -155,11 +158,6 @@ class Crawler implements IF_UNIT
 
 				//	...
 				$this->_RegisterFullPath($parsed, $match[2], $doc_root);
-
-				//	...
-				if(!$doc_root ){
-					continue;
-				};
 
 				/** Change document root path And remove FQDN.
 				 *

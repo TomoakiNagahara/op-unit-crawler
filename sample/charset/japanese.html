@@ -1,0 +1,47 @@
+<?php
+/** op-unit-crawler:/sample/charset/japanese.html
+ *
+ * @created   2020-02-02
+ * @version   1.0
+ * @package   op-unit-crawler
+ * @author    Tomoaki Nagahara <tomoaki.nagahara@gmail.com>
+ * @copyright Tomoaki Nagahara All right reserved.
+ */
+
+/** namespace
+ *
+ */
+namespace OP;
+
+?>
+<?php include('../breadcrumbs.phtml') ?>
+<section>
+	<ul>
+		<?php
+		//	...
+		foreach( ['SHIFT_JIS','EUC-JP','UTF-8'] as $charset ){
+			//	...
+			$join = [];
+			$join['charset'] = $charset;
+			$href = http_build_query($join);
+
+			//	...
+			printf('<li><a href="?%s">%s</a></li>', $href, $charset);
+		}
+		?>
+	</ul>
+</section>
+<?php
+//	...
+if(!$charset = $_GET['charset'] ?? null ){
+	return;
+}
+
+//	...
+$string = $_GET['string'] ?? 'これは日本語のテストです。';
+
+//	...
+echo mb_convert_encoding($string, $charset, 'utf-8');
+
+//	...
+header("content-type: text/html; charset={$charset}");

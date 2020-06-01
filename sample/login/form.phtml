@@ -1,0 +1,58 @@
+<?php
+/** op-unit-crawler:/sample/login/form.phtml
+ *
+ * @created   2020-02-02
+ * @version   1.0
+ * @package   op-unit-crawler
+ * @author    Tomoaki Nagahara <tomoaki.nagahara@gmail.com>
+ * @copyright Tomoaki Nagahara All right reserved.
+ */
+
+/** namespace
+ *
+ */
+namespace OP;
+
+?>
+<p>Please input Username and Password.</p>
+<form action="" method="post" style="margin:1em;">
+	<table>
+		<tr>
+			<td>Username</td><td> : </td>
+			<td>
+				<input type="text"     name="username" value="<?= $_POST['username'] ?? null ?>" />
+				<?php
+				if( $_SERVER['REQUEST_METHOD'] === 'POST' ){
+					if( empty($_POST['username']) ){
+						html('Empty username.');
+					}else
+					if( $_POST['username'] !== 'username' ){
+						html('Unmatch Username.');
+					}
+				}
+				?>
+			</td>
+		</tr>
+		<tr>
+			<td>Password</td><td> : </td>
+			<td>
+				<input type="password" name="password" value="<?= $_POST['password'] ?? null ?>" />
+				<?php
+				if( $_SERVER['REQUEST_METHOD'] === 'POST' ){
+					if( empty($_POST['password']) ){
+						html('Empty password.');
+					}else
+					if( $_POST['password'] !== 'password' ){
+						html('Unmatch password.');
+					}
+				}
+				?>
+			</td>
+		</tr>
+		<tr>
+			<td></td>
+			<td></td>
+			<td><input type="submit" value=" Submit " /></td>
+		</tr>
+	</table>
+</form>

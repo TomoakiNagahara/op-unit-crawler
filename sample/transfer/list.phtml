@@ -1,0 +1,21 @@
+<?php
+/** op-unit-crawler:/sample/transfer/list.phtml
+ *
+ * @created   2020-02-02
+ * @version   1.0
+ * @package   op-unit-crawler
+ * @author    Tomoaki Nagahara <tomoaki.nagahara@gmail.com>
+ * @copyright Tomoaki Nagahara All right reserved.
+ */
+
+/** namespace
+ *
+ */
+namespace OP;
+
+?>
+<ul>
+<?php foreach( glob('transfer-*\.html') as $file ): ?>
+	<li><a href="<?= $file ?>"><?= $file ?></a></li>
+<?php endforeach; ?>
+</ul>

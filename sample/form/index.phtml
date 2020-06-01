@@ -1,0 +1,45 @@
+<?php
+/** op-unit-crawler:/sample/form/index.phtml
+ *
+ * @created   2020-02-02
+ * @version   1.0
+ * @package   op-unit-crawler
+ * @author    Tomoaki Nagahara <tomoaki.nagahara@gmail.com>
+ * @copyright Tomoaki Nagahara All right reserved.
+ */
+
+/** namespace
+ *
+ */
+namespace OP;
+
+//	...
+$post = Encode($_POST);
+$username = $post['username'] ?? null;
+$password = $post['password'] ?? null;
+
+//	...
+$io = ($username === 'guest' and $password === 'guest') ? true: false;
+
+//	...
+if( $io ){
+	Html('Login successful.');
+	return;
+}
+
+?>
+<form action="/_testcase/form/" method="post">
+	<?php foreach(['username','password'] as $key): ?>
+		<?= ucfirst($key) ?><br/>
+		<input type="<?= $key ?>" name="<?= $key ?>" value="<?= ${$key} ?>"/><br/>
+		<?php if( $_SERVER['REQUEST_METHOD'] === 'POST' ): ?>
+			<?php if( empty(${$key}) ): ?>
+				<p>Please input <?= $key ?></p>
+			<?php elseif( ${$key} !== 'guest' ): ?>
+				<p>Unmatch <?= $key ?></p>
+			<?php endif; ?>
+		<?php endif; ?>
+	<?php endforeach; ?>
+	<input type="hidden" name="testcase" value="1"/>
+	<input type="submit" value=" submit "/><br/>
+</form>

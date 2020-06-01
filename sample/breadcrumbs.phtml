@@ -1,0 +1,39 @@
+<?php
+/** op-unit-crawler:/sample/breadcrumbs.phtml
+ *
+ * @created   2020-02-02
+ * @version   1.0
+ * @package   op-unit-crawler
+ * @author    Tomoaki Nagahara <tomoaki.nagahara@gmail.com>
+ * @copyright Tomoaki Nagahara All right reserved.
+ */
+
+/** namespace
+ *
+ */
+namespace OP;
+
+//	...
+$uri = $_SERVER['REQUEST_URI'];
+
+//	...
+if( $pos = strpos($uri, '?') ){
+	$uri = substr($uri, 0, $pos);
+};
+
+//	...
+$uri  = preg_replace('|/+|', '/', trim($uri,'/'));
+$args = explode('/', $uri);
+$pop  = array_pop($args);
+?>
+<nav style="margin:1em;">
+	<a href="/">TOP</a> &gt;
+	<?php
+	$href = '/';
+	foreach( $args as $arg ){
+		$href .= "{$arg}/";
+		printf('<a href="%s">%s</a> &gt; ', $href, $arg);
+	};
+	echo $pop;
+	?>
+</nav>

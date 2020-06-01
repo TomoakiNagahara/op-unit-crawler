@@ -18,7 +18,6 @@ namespace OP\UNIT\CRAWLER;
  */
 use OP\OP_CORE;
 use OP\UNIT\CRAWLER_CORE;
-use OP\Env;
 
 /** Crawler
  *
@@ -133,21 +132,22 @@ class Condition
 	{
 		//	...
 		$host = $conf['host'];
-		$host = self::URL()->Hash($host);
+		$hash = self::URL()->Hash($host);
 
 		//	...
 		$config = [];
-		$config['order'][] = ' t_url.score desc            ';
-		$config['where'][] = " t_host.hash   =  $host      ";
-		$config['where'][] = ' t_url.score   >  0          ';
+		$config['order'][] = ' t_url.score desc               ';
+		$config['where'][] = " t_host.hash   =  $hash         ";
+		$config['where'][] = ' t_url.http_status_code is null ';
 
-		//	...
+		/*
 		if( $conf['crawled'] === 'null' ){
 			$config['where'][] = " t_url.crawled is null       ";
 		}else{
-			$timestamp = Env::Timestamp(1, '-1 hour');
+			$timestamp = \OP\Env::Timestamp(1, '-1 hour');
 			$config['where'][] = " t_url.crawled <  $timestamp ";
 		}
+		*/
 
 		//	...
 		return $config;

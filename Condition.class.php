@@ -59,13 +59,13 @@ class Condition
 			$config = self::_Status($condition);
 		}else
 
-		//	...
 		if( $condition['score']?? null ){
 			$config = self::_Score($condition);
 		}else
 
-		{
-			D();
+		//	...
+		if( true ){
+			$config = self::_Status($condition);
 		}
 
 		//	...

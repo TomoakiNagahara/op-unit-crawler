@@ -172,7 +172,7 @@ class Condition
 		return $config;
 	}
 
-	/** Score
+	/** Score is order by score.
 	 *
 	 * @created   2020-05-15
 	 * @param     array        $conf
@@ -180,14 +180,9 @@ class Condition
 	static function _Score($conf)
 	{
 		//	...
-		$host = $conf['host'];
-		$host = self::URL()->Hash($host);
-
-		//	...
 		$config = [];
-		$config['limit'] = $conf['limit'] ?? 1;
-		$config['where'][] = " t_url.ai > 0 ";
-		$config['order'] = 'score desc';
+		$config['order']   = ' t_url.score desc ';
+		$config['where'][] = ' t_url.ai > 0     ';
 
 		//	...
 		return $config;

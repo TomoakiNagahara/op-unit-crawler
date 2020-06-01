@@ -153,7 +153,7 @@ class Condition
 		return $config;
 	}
 
-	/** Status is null record
+	/** Can specify http status code record.
 	 *
 	 * @created   2020-05-15
 	 * @param     array        $conf
@@ -161,10 +161,12 @@ class Condition
 	static function _Status($conf)
 	{
 		//	...
+		$status = $conf['status'] ?? 'null';
+
+		//	...
 		$config = [];
-		$config['limit']   = $conf['limit'] ?? 1;
-		$config['order']   = ' t_url.created                  ';
-		$config['where'][] = " t_url.http_status_code is null ";
+		$config['order']   = ' t_url.score                        ';
+		$config['where'][] = " t_url.http_status_code is {$status}";
 
 		//	...
 		return $config;

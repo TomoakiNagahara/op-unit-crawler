@@ -207,6 +207,11 @@ class Crawler implements IF_UNIT
 				continue;
 			}
 
+			//	png data string.
+			if( strpos($link, 'data:image/png;base64,') === 0 ){
+				continue;
+			}
+
 			//	...
 			if( $link[0] === '"' or $link[0] === "'" ){
 				$link = trim($link, '"\'');

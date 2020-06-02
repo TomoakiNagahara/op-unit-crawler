@@ -17,6 +17,7 @@ namespace OP\UNIT;
  */
 use OP\Notice;
 use function OP\APP\Request;
+use function OP\Decode;
 
 /** CRAWLER_HELPER
  *
@@ -62,6 +63,10 @@ trait CRAWLER_HELPER
 	{
 		//	...
 		switch( $errno ){
+			case 3:  // URL format is malformed
+			case 6:  // Couldn't resolve host
+			case 7:  // Failed to connect
+			case 18: // Transfer closed with outstanding read data remaining
 			case 28: // Connection timed out
 				break;
 
@@ -73,7 +78,7 @@ trait CRAWLER_HELPER
 				break;
 
 			default:
-				Notice::Set("Not implemented yet. ({$errno})");
+				Notice::Set("This curl error is not implemented yet. ({$errno})");
 		}
 	}
 
@@ -90,40 +95,14 @@ trait CRAWLER_HELPER
 
 		//	...
 		$http = $this->Fetch($record);
-D($http);
+
 		//	...
 		if( $errno = $http['errno'] ?? null ){
 			$this->_CurlError($errno, $record);
 		}
 
-		//	Decrement score.
-		switch( $http_status_code = $http['head']['status'] ?? 0 ){
-			case 0:
-				D($http, $record);
-				$score = 1;
-				break;
-
-			case 200:
-				$score = 100;
-				break;
-
-			case 302:
-				$score = 10;
-				break;
-
-			case 301:
-			case 403:
-			case 404:
-			case 405: // Method Not Allowed
-			case 414: // Request-URI Too Long
-				$score = 10000;
-				break;
-
-			default:
-				D($http);
-				$score = 100000;
-				break;
-		}
+		//	...
+		$score = $http_status_code = $http['head']['status'] ?? 0;
 
 		//	...
 		$timestamp = gmdate(_OP_DATE_TIME_);
@@ -145,83 +124,77 @@ D($http);
 				}
 				break;
 
-			case 301: // Moved Permanently.
+			case 301: // Moved Permanently
 			case 302: // Temporary Redirect(Only GET  method)
 			case 307: // Temporary Redirect(Keep POST method)
-			case 303: // Upload progress page
+			case 303: // See Other - Upload progress page
 				//	...
 				if(!$location = $http['head']['location'] ){
 					throw new \Exception("Empty location.");
 				};
 
-				//	Register transfer location.
-				if( $ai = $this->_RegisterFullPath($record, $location) ){
+				//	Check if the scheme is the only difference.
+				$parsed = $this->URL()->Parse($location);
+				$p = $this->URL()->Build($parsed, ['scheme'=>null]);
+				$r = $this->URL()->Build($record, ['scheme'=>null]);
+				//	For camel case --> http://example.com/%XX --> https://example.com/%xx
+				$p = strtolower($p);
+				$r = strtolower($r);
+				//	&amp; --> &
+				$p = Decode($p);
+				$r = Decode($r);
 
-					//	Remove http status code to crawl again.
+				//	Are the URLs the same?
+				//	http://example.com --> https://example.com
+				$io = $p === $r;
+
+				//	for debug
+				if( $io ){
+					//	only difference of just scheme.
+				}else{
+					D($io);
+					D($r);
+					D($p);
+				}
+
+				//	If only un match scheme.
+				if( $io ){
+
+					//	Update scheme and,
+					//	Remove http status code, for crawl again.
 					$update = [];
+					$update['scheme'] = $this->URL()->Scheme()->Ai($parsed['scheme']);
 					$update['http_status_code'] = null;
-					$this->URL()->Update($ai, $update);
+					$this->URL()->Update($record['ai'], $update);
 
-					//	...
-					if( $ai == $record['ai'] ){
-						//	If scheme downgrade.
-						if( $record['scheme'] === 'https' and strpos($location, 'http://') === 0 ){
-							//	Do downgrade.
-							$update = [];
-							$update['http_status_code'] = null;
-							$update['scheme'] = 0;
-							$this->URL()->Update($record['ai'], $update);
-						}
+					//	https complementation plan
+					$scheme = $update['scheme'];
+					$host   = $this->URL()->Host()->Ai($parsed['host']);
+					$config = [];
+					$config['table'] = 't_url';
+					$config['limit'] = -1;
+					$config['set'][]   = " scheme = $scheme ";
+					$config['where'][] = " scheme = 0       ";
+					$config['where'][] = " host   = $host   ";
+					$io = $this->URL()->DB()->Update($config);
 
-						/*
-						//	Change scheme to https from http.
-						if( $scheme === 'http' and $record['scheme'] === 'https' ){
+				}else{
 
+					//	Register transfer location.
+					$ai = $this->_RegisterFullPath($record, $location);
 
-							Notice::Set('Is this need? When?'); // Maybe overwrite scheme
+					//	Update transfer location to source url record.
+					$update = [];
+					$update['transfer'] = $ai;
+					$this->URL()->Update($record['ai'], $update);
+				}
+				break;
 
-
-							$update = [];
-							$update['http_status_code'] = null;
-							$update['scheme'] = $record['scheme'];
-							$this->URL()->Update($record['ai'], $update);
-						};
-						*/
-					}else{
-						//	...
-						$update = [];
-						$update['transfer'] = $ai;
-						$this->URL()->Update($record['ai'], $update);
-
-						/*
-						//	...
-						$record['transfer'] = $ai;
-						$this->URL()->Register($record);
-						*/
-
-						/*
-						//	...
-						$update = [];
-						$update['transfer'] = $ai;
-						$this->URL()->Update($record['ai'], $update);
-
-						//	...
-						if( $record['form'] ){
-							//	...
-							$form = $this->URL()->Form()->Ai($record['form']);
-
-							//	...
-							$update = [];
-							$update['form'] = $form;
-							$this->URL()->Update($ai, $update);
-
-							D($ai, $update);
-						}
-						*/
-					};
-				};
-
-				//	...
+			case 400: // Bad request
+			case 403:
+			case 404:
+			case 405: // Method Not Allowed
+			case 414: // Request-URI Too Long
 				break;
 
 				//	Method Not Allowed
@@ -243,6 +216,9 @@ D($http);
 						$this->URL()->Update($record['ai'], $update);
 					};
 				};
+				break;
+
+			case 500: // Internal Server Error
 				break;
 
 				//	...

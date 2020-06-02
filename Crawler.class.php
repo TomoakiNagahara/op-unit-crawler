@@ -22,6 +22,7 @@ use OP\OP_UNIT;
 use OP\IF_UNIT;
 use OP\Env;
 use OP\Debug;
+use OP\UNIT\CRAWLER\Condition;
 use function OP\Html;
 use function OP\ConvertPath;
 use function OP\APP\Request;
@@ -356,7 +357,7 @@ class Crawler implements IF_UNIT
 				return $this->Register(array_merge($parsed, ['path'=>$path,'query'=>$query]));
 			};
 
-			//	Current relative path.
+			//	Explicitly specified Current relative path.
 			if( strpos($path, './') === 0 ){
 				//	Remove "./"
 				$path = substr($path, 2);
@@ -380,7 +381,7 @@ class Crawler implements IF_UNIT
 			//	Parent relative path.
 			if( strpos($path, '../') === 0 ){
 				//	...
-				$current_dir = dirname($parsed['path']);
+				$parent_dir = dirname($parsed['path']);
 
 				//	Adjust parent relative path.
 				while( strpos($path, '../') === 0 ){
@@ -388,20 +389,20 @@ class Crawler implements IF_UNIT
 					$path = substr($path, 3);
 
 					//	...
-					$parent_dir = dirname($current_dir);
+					$parent_dir = dirname($parent_dir);
 				};
 
 				//	...
 				$path = rtrim($parent_dir,'/') .'/'. $path;
 			};
 
-			//	What is this needed for?
-			/*
-			if( dirname($parsed['path']) === '/' ){
-				\OP\Debug::Set('path',"Path is not has parent directory. ({$parsed['path']}, $path)");
-				continue;
-			};
-			*/
+			//	Not Explicitly specified Current relative path.
+			if( $path[0] !== '/' ){
+				//	parent directory.
+				$parent_dir = dirname($parsed['path']);
+				//	Join to parent directory.
+				$path = $parent_dir .'/'. $path;
+			}
 
 			//	Same path.
 			if( $path === $parsed['path'] ){
@@ -440,6 +441,9 @@ class Crawler implements IF_UNIT
 			if( $pos  = strpos($path, '#') ){
 				$path = substr($path, 0, $pos);
 			};
+
+			//	Remove duplicate slash.
+			$path = str_replace('//', '/', $path);
 
 			//	...
 			return $this->Register(array_merge($parsed, ['path'=>$path,'query'=>$query]));
@@ -592,8 +596,8 @@ class Crawler implements IF_UNIT
 
 		//	...
 		switch( $type ){
-			case 'js':
 			case 'css':
+			case 'javascript':
 				return true;
 		}
 
@@ -640,12 +644,14 @@ class Crawler implements IF_UNIT
 	function Auto($config, $callback)
 	{
 		//	...
-		if(!$cond = $this->_AutoCondition($config) ){
-			return;
-		};
+		$limit = $config['limit'] ?? 1;
+		$sleep = $config['sleep'] ?? 0;
+		$times = $config['times'] ?? '1 min';
 
 		//	...
-		$limit = $config['limit'] ?? 1;
+		if(!is_numeric($times) ){
+			$timeout = strtotime($times);
+		}
 
 		//	...
 		if( $limit > 1000 ){
@@ -653,7 +659,13 @@ class Crawler implements IF_UNIT
 		};
 
 		//	...
+		if(!$cond = Condition::Auto($config) ){
+			return;
+		};
+
+		//	...
 		for( $i=0; $i<$limit; $i++ ){
+
 			//	...
 			if(!$record = $this->URL()->Record($cond) ){
 				return;
@@ -675,23 +687,53 @@ class Crawler implements IF_UNIT
 			$this->_current_ai = $ai;
 
 			//	...
+			echo "$i: $ai: " . urldecode($url);
+
+			//	...
 			if(!$http = $this->_AutoHttp($record) ){
 				continue;
 			};
 
-			/*
-			if( $record['form'] ){
-				D($url, $record, $http);
-			}
-			*/
-
 			//	...
-			$this->_RegisterLink($url, $http['head']['mime'] ?? null, $http['body'], $config);
+			$this->_RegisterLink($url, $http['head']['mime'] ?? null, $http['body'], $record['host']);
 
 			//	...
 			if( $callback ){
 				call_user_func($callback, $url, $http);
 			};
+
+			//	...
+			if( isset($config['ai']) or isset($config['url']) ){
+				//	not skip --> infinity loop
+			}else{
+				//	If skip
+				if( isset($http['head']['mime']) and self::_IsSkipMime($http['head']['mime']) ){
+					$limit++;
+					echo ' - skip';
+				}else{
+					//	Sleep
+					if( $sleep and $limit > 1 ){
+						sleep($sleep);
+					}
+				}
+			}
+
+			//	timeout
+			if( $timeout <= time() ){
+				$i = $limit;
+			}
+
+			//	last time sec
+			$time = $timeout - time();
+			echo " timeout({$time}) ";
+
+			//	Check if limit is 1.
+			if( 1 !== (int)($config['limit'] ?? 1) ){
+				echo "sleep({$sleep})";
+			}
+
+			//	...
+			echo \OP\Env::isHttp() ? '<br/>':"\n";
 		};
 	}
 
@@ -733,8 +775,18 @@ class Crawler implements IF_UNIT
 			$parsed['scheme']  =  $this->_current_scheme;
 		}
 
+
+		if( empty($parsed['path']) ){
+			D($parsed);
+		}
+
+
 		//	...
-		if(!$ai = $this->URL()->Register($parsed, $this->_current_score) ){
+		$score  = $this->_current_score;
+		$score += $this->_AddScore($parsed['path']);
+
+		//	...
+		if(!$ai = $this->URL()->Register($parsed, $score) ){
 			return;
 		};
 

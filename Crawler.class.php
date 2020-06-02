@@ -318,13 +318,22 @@ class Crawler implements IF_UNIT
 
 			//	FQDN
 			if( preg_match('|^[a-z+]+://|', $href) ){
-				$merged = array_merge(['scheme' => $parsed['scheme']], parse_url($href));
+
+				//	...
+				$merged = $this->URL()->Parse($href);
+
+				//	...
+				if(!$merged['scheme'] ?? null ){
+					$merged['scheme'] = $parsed['scheme'];
+				}
+
+				//	...
 				return $this->Register($merged);
 			};
 
 			//	Scheme less path. (FQDN)
 			if( strpos($href, '//') === 0 ){
-				$merged = array_merge(parse_url($href), ['scheme' => $parsed['scheme']]);
+				$merged = array_merge($this->URL()->Parse($href), ['scheme' => $parsed['scheme']]);
 				return $this->Register($merged);
 			};
 
@@ -341,12 +350,6 @@ class Crawler implements IF_UNIT
 			if( $pos  = strpos($path, '#') ){
 				$path = substr($path, 0, $pos);
 			};
-
-			/*
-			//	...
-			$path  = $this->URL()->Parse($href)['path'];
-			$query = $this->URL()->Parse($href)['query'];
-			*/
 
 			//	Document root path.
 			if( strpos($path, '/') === 0 ){

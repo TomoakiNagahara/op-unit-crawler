@@ -296,19 +296,25 @@ class Crawler implements IF_UNIT
 		}
 
 			//	...
+			if( $href === $parsed['path'] ){
+				return;
+			};
+
+			//	...
 			if( strpos($href, '#') === 0 ){
 				return;
 			};
 
+		/**
+		 *  data --> data:application/x-font-woff;
+		 */
+		foreach(['tel','mailto','javascript','ios-app','android-app','data'] as $key){
 			//	...
-			if( strpos($href, 'mailto:') === 0 ){
+			if( strpos($href, "{$key}:") === 0 ){
+				D('Invalid URL:', $key, $href);
 				return;
 			};
-
-			//	...
-			if( $href === $parsed['path'] ){
-				return;
-			};
+		}
 
 			//	FQDN
 			if( preg_match('|^[a-z+]+://|', $href) ){

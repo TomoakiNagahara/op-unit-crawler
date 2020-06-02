@@ -240,6 +240,61 @@ class Crawler implements IF_UNIT
 	 */
 	private function _RegisterFullPath($parsed, $href)
 	{
+		//	...
+		if( empty($href) ){
+			return;
+		}
+
+		//	...
+		$orig = $href;
+		$sour = ['%2F', '%3A', '%23', '%3F', '%3D', '%2C','%25', '%28', '%29', '%3B','%26','%40','%20'];
+		$dist = [  '/',   ':',   '#',   '?',   '=',   ',',  '%',   '(',   ')',   ';',  '&',  '@',  ' '];
+
+		//	URL Encode. multi byte to ascii
+		$deco = urldecode($href);
+		$enco = urlencode($deco);
+		$href = str_replace($sour, $dist, $enco);
+
+		//	This logic is just debug only.
+		if( $href !== $orig ){
+			if( $orig === $deco ){
+				//	OK
+			}else if( $deco === $href ){
+				//	OK
+			}else if( $deco === urldecode($href) ){
+				//	OK
+			}else if( strtolower($deco) === strtolower($href) ){
+				//	D( 'case sensitive' );
+			}else{
+
+				$temp = [];
+				$temp['origin'] = $orig;
+				$temp['decode'] = $deco;
+				$temp['encode'] = $enco;
+				$temp['href']   = $href;
+				$temp['urldeco']= urldecode($href);
+				D($temp, '%26%23038%3B');
+
+				//	...
+				$str = '';
+				for( $i=0; $i<strlen($href); $i++ ){
+					//	...
+					if( $deco[$i] === $href[$i] ){
+						$str[$i] = $href[$i];
+						continue;
+					}
+					$a = $deco[$i];
+					$b = $href[$i];
+					D($deco);
+					//	...
+					D('## EXCEPTION ##');
+					throw new \Exception("$i: $a, $b - $str");
+				}
+
+				D($str);
+			}
+		}
+
 			//	...
 			if( strpos($href, '#') === 0 ){
 				return;

@@ -644,18 +644,18 @@ class Crawler implements IF_UNIT
 	function Auto($config, $callback)
 	{
 		//	...
-		$limit = $config['limit'] ?? 1;
+		$times = $config['times'] ?? 1;
+		$limit = $config['limit'] ?? '1 min';
 		$sleep = $config['sleep'] ?? 0;
-		$times = $config['times'] ?? '1 min';
 
 		//	...
-		if(!is_numeric($times) ){
-			$timeout = strtotime($times);
+		if(!is_numeric($limit) ){
+			$timeout = strtotime($limit);
 		}
 
 		//	...
-		if( $limit > 1000 ){
-			$limit = 1000;
+		if( $times > 1000 ){
+			$times = 1000;
 		};
 
 		//	...
@@ -664,7 +664,7 @@ class Crawler implements IF_UNIT
 		};
 
 		//	...
-		for( $i=0; $i<$limit; $i++ ){
+		for( $i=0; $i<$times; $i++ ){
 
 			//	...
 			if(!$record = $this->URL()->Record($cond) ){
@@ -708,11 +708,11 @@ class Crawler implements IF_UNIT
 			}else{
 				//	If skip
 				if( isset($http['head']['mime']) and self::_IsSkipMime($http['head']['mime']) ){
-					$limit++;
+					$times++;
 					echo ' - skip';
 				}else{
 					//	Sleep
-					if( $sleep and $limit > 1 ){
+					if( $sleep and $times > 1 ){
 						sleep($sleep);
 					}
 				}
@@ -720,7 +720,7 @@ class Crawler implements IF_UNIT
 
 			//	timeout
 			if( $timeout <= time() ){
-				$i = $limit;
+				$times = 0;
 			}
 
 			//	last time sec

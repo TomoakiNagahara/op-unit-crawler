@@ -312,7 +312,7 @@ class Crawler implements IF_UNIT
 		foreach(['tel','mailto','javascript','ios-app','android-app','data'] as $key){
 			//	...
 			if( strpos($href, "{$key}:") === 0 ){
-				D('Invalid URL:', $key, $href);
+			//	D('Invalid URL:', $key, $href);
 				return;
 			};
 		}
@@ -651,6 +651,8 @@ class Crawler implements IF_UNIT
 		//	...
 		if(!is_numeric($limit) ){
 			$timeout = strtotime($limit);
+		}else{
+			$timeout = time() + $times;
 		}
 
 		//	...
@@ -687,7 +689,7 @@ class Crawler implements IF_UNIT
 			$this->_current_ai = $ai;
 
 			//	...
-			echo "$i: $ai: " . urldecode($url);
+			D("$i: $ai: " . urldecode($url));
 
 			//	...
 			if(!$http = $this->_AutoHttp($record) ){
@@ -709,10 +711,10 @@ class Crawler implements IF_UNIT
 				//	If skip
 				if( isset($http['head']['mime']) and self::_IsSkipMime($http['head']['mime']) ){
 					$times++;
-					echo ' - skip';
 				}else{
 					//	Sleep
 					if( $sleep and $times > 1 ){
+						D("sleep - $sleep");
 						sleep($sleep);
 					}
 				}
@@ -725,15 +727,7 @@ class Crawler implements IF_UNIT
 
 			//	last time sec
 			$time = $timeout - time();
-			echo " timeout({$time}) ";
-
-			//	Check if limit is 1.
-			if( 1 !== (int)($config['limit'] ?? 1) ){
-				echo "sleep({$sleep})";
-			}
-
-			//	...
-			echo \OP\Env::isHttp() ? '<br/>':"\n";
+			D(" time limit({$time})");
 		};
 	}
 

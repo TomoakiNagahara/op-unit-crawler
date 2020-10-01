@@ -69,7 +69,7 @@ class Crawler implements IF_UNIT
 	 * @param  string  $html    Target page html
 	 * @param  string  $rewrite_base Rewrite base
 	 */
-	private function _RegisterLink($url, $mime, &$html, string $rewrite_base)
+	function _RegisterLink($url, $mime, &$html, string $rewrite_base)
 	{
 		//	...
 		if(!$rewrite_base ){

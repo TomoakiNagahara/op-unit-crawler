@@ -109,15 +109,18 @@ class Condition
 		//	...
 		$host = $parsed['host'];
 		$path = $parsed['path'];
+		$query= $parsed['query'];
 
 		//	...
 		$host = self::URL()->Hash($host);
 		$path = self::URL()->Hash($path);
+		$query= self::URL()->Hash($query);
 
 		//	...
 		$config = [];
-		$config['where'][] = " t_host.hash = $host";
-		$config['where'][] = " t_path.hash = $path";
+		$config['where'][] = " t_host.hash  = $host";
+		$config['where'][] = " t_path.hash  = $path";
+		$config['where'][] = " t_query.hash = $query";
 
 		//	...
 		return $config;
